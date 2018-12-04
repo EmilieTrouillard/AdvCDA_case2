@@ -121,8 +121,8 @@ def get_all_frequent_itemsets(order_array, frequent_items):
         if len(frequent_itemsets_k) == 0:
             flag = False
         else:
-            frequent_itemsets_all[k] = frequent_itemsets_k
+            frequent_itemsets_all[k] = [(itemset, occurence) for itemset, occurence in C_frequent.items()]
     return frequent_itemsets_all
 
 #%%
-get_all_frequent_itemsets(order_array, list_frequent_items)
+F = get_all_frequent_itemsets(order_array, list_frequent_items)
