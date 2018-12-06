@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from itertools import combinations, groupby
 from collections import Counter
+import time
 
 orders_file = 'instacart_2017_05_01/orders.csv'
 products_file = 'instacart_2017_05_01/products.csv'
@@ -75,7 +76,7 @@ aisle_products['frequency'] = aisle_products.apply(frequency, axis=1)
 #%%
 frequent_products = aisle_products[aisle_products['frequency']>= SUPPORT_THRESHOLD]
 #list_frequent_items = [set([item]) for item in frequent_products.index]
-list_frequent_items = [[i] for i in frequent_products.index]
+dict_frequent_items = {(i,): aisle_products.loc[i, 'occurences'] for i in frequent_products.index}
 
 #%%
 order_array = np.array(aisle_ordersproducts, dtype=object)
@@ -104,13 +105,12 @@ def get_itemsets(order_item, candidates,k):
 #%%
 def get_all_frequent_itemsets(order_array, frequent_items):
     flag = True
-    frequent_itemsets_k = frequent_items
+    frequent_itemsets_k = list(frequent_items.keys())
     frequent_itemsets_all = {1: frequent_items}
-    frequent_orders = np.array([item for item in order_array if [item[1]] in frequent_items])
+    frequent_orders = np.array([item for item in order_array if (item[1],) in frequent_itemsets_k])
     k = 1
     while flag:
         k += 1
-        print(k)
         candidates = Counter(get_candidates_subsets(frequent_itemsets_k))
         C = Counter(get_itemsets(frequent_orders, candidates,k))
         C_frequent = C.copy()
@@ -121,8 +121,13 @@ def get_all_frequent_itemsets(order_array, frequent_items):
         if len(frequent_itemsets_k) == 0:
             flag = False
         else:
-            frequent_itemsets_all[k] = [(itemset, occurence) for itemset, occurence in C_frequent.items()]
+            frequent_itemsets_all[k] = {itemset: occurence for itemset, occurence in C_frequent.items()}
     return frequent_itemsets_all
 
 #%%
-F = get_all_frequent_itemsets(order_array, list_frequent_items)
+start_time = time.time()
+F = get_all_frequent_itemsets(order_array, dict_frequent_items)
+execution_time = time.time() - start_time
+print('Execution time: ', execution_time)
+print(sum([len(v) for v in F.values()]), ' frequent itemsets')
+print('Max length of the frequent itemsets: ', max(F.keys()))
