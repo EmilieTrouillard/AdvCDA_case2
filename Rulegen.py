@@ -151,6 +151,8 @@ order_array = np.array(aisle_ordersproducts, dtype=object)
 
 #%%
 def get_candidates_subsets(frequent_itemsets):
+    if len(frequent_itemsets) == 0:
+        return[]
     k = len(frequent_itemsets[0])
     for i, pair1 in enumerate(frequent_itemsets[:-1]):
         for pair2 in frequent_itemsets[i+1:]:
@@ -224,7 +226,7 @@ threshold=0.25
  
 thresh=0.05
 rulelist=[]
-        
+        #%%
 for itemset,occ in F[4].items():
     cand=list(itemset)
     for conseq in itemset:
@@ -258,35 +260,26 @@ apriori(aisle_ordersproducts, min_support=0.6)
  #%%
 #def update(items,consequents,count)
 maxrule=4
-                
-        
-        
-for itemset,occ in F[4].items():
-    cand=list(itemset)
-    for conseq in itemset:
-        antece=list(itemset)
-        antece.remove(conseq)
-        antece=tuple(antece)
-        confi=confget(antece,tuple(itemset))
-        if confi<thresh:
-            cand.remove(conseq)
-        else:
-            rulelist.append((antece,(conseq,),confi))
-    pairs=findsubsets(cand,2)
-    cand=pairs
-    for conseq in pairs:
-        antece=list(itemset)
-        print(antece,conseq)
-        #antece.remove(conseq)
-        antece=[x for x in antece if x not in conseq]
-        antece=tuple(antece)
-        confi=confget(antece,itemset)
-        if confi<thresh:
-            cand.remove(conseq)
-        else:
-            rulelist.append((antece,(conseq,),confi))
-
-  
+rulelist=[]                
+for k, dic in F.items():
+    for itemset, occ in dic.items():
+        cand=[(item,) for item in itemset]
+        subsets = cand
+        i = 1
+        while len(cand) > 0 and i < k:
+            for conseq in subsets:
+                antece=[x for x in itemset if x not in conseq]
+                antece=tuple(antece)
+                confi=confget(antece,itemset)
+                if confi<thresh:
+                    cand.remove(conseq)
+                else:
+                    rulelist.append((antece,(conseq,),confi))
+            
+            subsets = list(get_candidates_subsets(cand))
+            cand = subsets
+            i +=1
+      
 
 
 
