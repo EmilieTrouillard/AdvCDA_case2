@@ -22,18 +22,18 @@ import pandas as pd
 from itertools import combinations, groupby
 from collections import Counter
 
-#orders_file = 'orders.csv'
-#products_file = 'products.csv'
-#prior_file = 'order_products__prior.csv'
-#train_file = 'order_products__train.csv'
-#aisles_file = 'aisles.csv'
-#departments_file = 'departments.csv'
-orders_file = 'instacart_2017_05_01/orders.csv'
-products_file = 'instacart_2017_05_01/products.csv'
-prior_file = 'instacart_2017_05_01/order_products__prior.csv'
-train_file = 'instacart_2017_05_01/order_products__train.csv'
-aisles_file = 'instacart_2017_05_01/aisles.csv'
-departments_file = 'instacart_2017_05_01/departments.csv'
+orders_file = 'orders.csv'
+products_file = 'products.csv'
+prior_file = 'order_products__prior.csv'
+train_file = 'order_products__train.csv'
+aisles_file = 'aisles.csv'
+departments_file = 'departments.csv'
+#orders_file = 'instacart_2017_05_01/orders.csv'
+#products_file = 'instacart_2017_05_01/products.csv'
+#prior_file = 'instacart_2017_05_01/order_products__prior.csv'
+#train_file = 'instacart_2017_05_01/order_products__train.csv'
+#aisles_file = 'instacart_2017_05_01/aisles.csv'
+#departments_file = 'instacart_2017_05_01/departments.csv'
 
 
 #%%
@@ -212,5 +212,30 @@ def get_product_names(list_ids):
     return tuple([df_fruits.loc[id, 'product_name'] for id in list_ids])
 
 top_rules_names = [tuple(list(map(get_product_names, rule[:2]))+ [rule[2]]) for rule in top_rules]
-        
+#%% Fast implemented
+
+#This takes long
+from pymining import itemmining, assocrules
+transactions=aisle_orders['products']
+item_sets = itemmining.get_relim_input(transactions)
+#%%
+
+min_supp= SUPPORT_THRESHOLD * NUMBER_ORDERS_AISLE
+item_sets = itemmining.relim(item_sets, min_support=min_supp)
+
+#%%
+thresholds = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
+times = []
+max_lengths = []
+numbers = []
+for t in thresholds:
+    start = time.time()          
+    rules = assocrules.mine_assoc_rules(item_sets, min_support=min_supp, min_confidence=t)
+    execution_time = time.time() - start
+    times.append(execution_time)
+    max_lengths.append(max([len(i[1]) for i in rules]))
+    numbers.append(len(rules))
+
+
+      
     
