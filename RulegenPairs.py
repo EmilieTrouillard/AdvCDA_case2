@@ -49,55 +49,24 @@ df_products= pd.read_csv(products_file)
 #df_departments= pd.read_csv(departments_file)
 df_aisles= pd.read_csv(aisles_file)
 
-#%% Set the index of the dataframe aisles to be the aisle.id
-df_aisles = df_aisles.set_index(df_aisles['aisle_id'].values)
-df_aisles = df_aisles.drop(['aisle_id'], axis=1)
-
-#%% Display the number of products per aisle
-aisles = df_products.groupby(['aisle_id']).count()
-aisles = aisles.reset_index()
-aisles = aisles.sort_values(by=['product_id'], ascending = False)
-def get_aisle_name(row):
-    return df_aisles.loc[row.aisle_id, 'aisle']
-aisles['aisle_name'] = aisles.apply(get_aisle_name, axis = 1)
-aisles = aisles.set_index(aisles['aisle_id'].values)
-aisles = aisles.drop(['aisle_id', 'department_id', 'product_name'], axis = 1)
-aisles.columns = ['number_of_products', 'aisle_name']
-
-#%% Select the combination of the 3 aisles
-df_fruits = df_products[df_products['aisle_id'].isin([24,83,123])]
-products_id = df_fruits['product_id'].values
-df_fruits = df_fruits.set_index(products_id)
-
-aisle_orders = df_allOrdersProducts[df_allOrdersProducts['product_id'].isin(products_id)]
-aisle_ordersproducts = aisle_orders.drop(['add_to_cart_order', 'reordered', 'index'], axis=1)
-
-aisle_orders = aisle_ordersproducts.groupby(['order_id']).agg({'product_id': lambda x: tuple(x)})
-aisle_orders.columns = ['products']
+#%%
+df_products = df_products.set_index(df_products['product_id'].values)
+#%%
+count_products = df_allOrdersProducts[['order_id', 'product_id']].groupby(['product_id']).count()
+count_products.columns = ['occurences']
+count_products = count_products.sort_values(by=['occurences'], ascending=False)
 
 #%%
-NUMBER_ORDERS_AISLE = len(aisle_orders)
+SUPPORT_THRESHOLD = 0.008
+OCCURENCES_THRESHOLD = SUPPORT_THRESHOLD * NUMBER_ORDERS_TOTAL
 
 #%%
-aisle_products = aisle_ordersproducts.groupby(['product_id']).count()
-aisle_products.columns = ['occurences']
-aisle_products = aisle_products.sort_values(by=['occurences'], ascending=False)
-
-#%%
-SUPPORT_THRESHOLD = 0.001
-OCCURENCES_THRESHOLD = SUPPORT_THRESHOLD * NUMBER_ORDERS_AISLE
-#%%
-def frequency(row):
-    return row.occurences/NUMBER_ORDERS_AISLE
-aisle_products['frequency'] = aisle_products.apply(frequency, axis=1)
-
-#%%
-frequent_products = aisle_products[aisle_products['frequency']>= SUPPORT_THRESHOLD]
+frequent_products = count_products[count_products['occurences']>= OCCURENCES_THRESHOLD]
 #list_frequent_items = [set([item]) for item in frequent_products.index]
-dict_frequent_items = {(i,): aisle_products.loc[i, 'occurences'] for i in frequent_products.index}
+dict_frequent_items = {(i,): count_products.loc[i, 'occurences'] for i in frequent_products.index}
 
 #%%
-order_array = np.array(aisle_ordersproducts, dtype=object)
+order_array = np.array(df_allOrdersProducts.drop(['add_to_cart_order', 'reordered', 'index'], axis=1), dtype=object)
 
 #%%
 def get_candidates_subsets(frequent_itemsets):
@@ -129,7 +98,7 @@ def get_all_frequent_itemsets(order_array, frequent_items):
     frequent_itemsets_all = {1: frequent_items}
     frequent_orders = np.array([item for item in order_array if (item[1],) in frequent_itemsets_k])
     k = 1
-    while flag:
+    while flag and k <2:
         k += 1
         candidates = Counter(get_candidates_subsets(frequent_itemsets_k))
         C = Counter(get_itemsets(frequent_orders, candidates,k))
@@ -145,18 +114,14 @@ def get_all_frequent_itemsets(order_array, frequent_items):
     return frequent_itemsets_all
 
 #%%
+start = time.time()
 F = get_all_frequent_itemsets(order_array, dict_frequent_items)
-
+itemset_running_time = time.time() - start
+print('Time for generating the frequent itemsets: ', itemset_running_time)
 #%%
-#%%effiecient apriori:
+##%%effiecient apriori:
 #from mlxtend.frequent_patterns import apriori
-#thresholds = [0.0001, 0.0025, 0.005, 0.0075, 0.001, 0.0025, 0.005, 0.0075, 0.01]
-#times = []
-#max_lengths = []
-#numbers = []
-#for threshold in thresholds:
-#    start = time.time()
-#    apriori(aisle_ordersproducts, min_support=0.6)
+#apriori(aisle_ordersproducts, min_support=0.6)
 
 
  #%%
@@ -181,27 +146,10 @@ def rule_generation(F, thresh):
                 cand = subsets
                 i +=1
     return rulelist
-
-thresholds = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45]
-times = []
-max_lengths = []
-numbers = []
-for t in thresholds:
-    start = time.time()          
-    rules = rule_generation(F, t)
-    execution_time = time.time() - start
-    times.append(execution_time)
-    max_lengths.append(max([len(i[1]) for i in rules]))
-    numbers.append(len(rules))
-    
-#%%
-plt.plot(thresholds, times, 'r+-')
-#plt.yscale('log')
-#plt.xscale('log')
-plt.xlabel('Confidence threshold')
-plt.ylabel('Running time')
-    
-
+start = time.time()
+rules = rule_generation(F, 0.01)
+rule_running_time = time.time() - start
+print('Time for generating the rules: ', rule_running_time)
 #%%
 sorted_rules = sorted(rules, key=lambda tup: tup[2], reverse=True)
 sorted_rules
@@ -209,7 +157,7 @@ sorted_rules
 top_rules = sorted_rules[:10]
 
 def get_product_names(list_ids):
-    return tuple([df_fruits.loc[id, 'product_name'] for id in list_ids])
+    return tuple([df_products.loc[id, 'product_name'] for id in list_ids])
 
 top_rules_names = [tuple(list(map(get_product_names, rule[:2]))+ [rule[2]]) for rule in top_rules]
         
